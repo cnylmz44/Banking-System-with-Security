@@ -28,4 +28,6 @@ public interface BankAccountDao {
 	boolean deleteBankAccount(BankAccount bankAccount);
 
 	String updateBalance(BankAccount bankAccount);
+
+	long getLastModified(String id);
 }

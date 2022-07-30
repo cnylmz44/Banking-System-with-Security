@@ -9,7 +9,7 @@ import com.example.bankingsystem.entities.BankAccount;
 
 @Mapper
 public interface BankAccountRepository {
-	public BankAccount findByNumber(String number);
+	public BankAccount findById(String id);
 
 	public void createAccount(BankAccount bankAccount);
 
@@ -20,4 +20,8 @@ public interface BankAccountRepository {
 	public void createBankAccountLog(String message);
 
 	public ArrayList<AccountLogResponse> findLogsByNumber(String id);
+
+	public long getLastModified(String id);
+
+	public String getUserByUsername(String username);
 }

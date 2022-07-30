@@ -4,6 +4,7 @@ import java.util.ArrayList;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.WebRequest;
 
 import com.example.bankingsystem.core.utilities.entities.AccountCreateRequest;
 import com.example.bankingsystem.core.utilities.entities.AccountCreateResponse;
@@ -19,7 +20,7 @@ public interface BankAccountService {
 
 	ResponseEntity<AccountCreateResponse> createAccount(AccountCreateRequest request);
 
-	ResponseEntity<BankAccount> getBankAccountDetails(String id);
+	ResponseEntity<BankAccount> getBankAccountDetails(String id, WebRequest webRequest);
 
 	ResponseEntity<BankAccount> depositMoney2BankAccount(String id, AccountDepositMoneyRequest depositedMoney);
 

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.WebRequest;
 
 import com.example.bankingsystem.business.abstracts.BankAccountService;
 import com.example.bankingsystem.core.utilities.entities.AccountCreateRequest;
@@ -23,7 +24,6 @@ import com.example.bankingsystem.entities.BankAccount;
 
 @RestController
 @RequestMapping("api/bankingsystem")
-//@CrossOrigin(origins = {"http://localhost"})
 public class BankAccountController {
 
 	private BankAccountService bankAccountService;
@@ -41,8 +41,9 @@ public class BankAccountController {
 
 	// Get Bank Account Details
 	@RequestMapping(path = "/accounts/{id}", method = RequestMethod.GET)
-	public ResponseEntity<BankAccount> getBankAccountDetails(@PathVariable(name = "id") String id) {
-		return bankAccountService.getBankAccountDetails(id);
+	public ResponseEntity<BankAccount> getBankAccountDetails(@PathVariable(name = "id") String id,
+			WebRequest webRequest) {
+		return bankAccountService.getBankAccountDetails(id, webRequest);
 	}
 
 	// Deposit to Bank Account

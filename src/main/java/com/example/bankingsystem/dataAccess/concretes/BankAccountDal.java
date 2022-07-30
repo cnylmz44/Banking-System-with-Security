@@ -20,16 +20,20 @@ public class BankAccountDal implements BankAccountDao {
 	@Autowired
 	private BankAccountRepository bankAccountRepository;
 
+	// Generate Bank Account Random
+	// Set Bank Account
 	@Override
 	public BankAccount createAccount(AccountCreateRequest request) {
 		String accountNumber = generateBankAccountNumber(10);
 		// Create Account with Constructor
-		bankAccount = new BankAccount(accountNumber, request.getName(), request.getSurname(), request.getEmail(),
-				request.getTc(), 0, request.getType(), false, System.currentTimeMillis());
+		bankAccount = new BankAccount(accountNumber, request.getName().toUpperCase(),
+				request.getSurname().toUpperCase(), request.getEmail(), request.getTc(), 0,
+				request.getType().toUpperCase(), false, System.currentTimeMillis());
 
 		return bankAccount;
 	}
 
+	// Generate 10 Digits Unique Account Number
 	public String generateBankAccountNumber(int digitNumber) {
 		String generatedNumber = "";
 		Random random = new Random();
@@ -69,10 +73,13 @@ public class BankAccountDal implements BankAccountDao {
 		}
 	}
 
-	public BankAccount getBankAccount(String accountNumber) {
-		return this.bankAccountRepository.findByNumber(accountNumber);
+	// Get Bank Account Details
+	public BankAccount getBankAccount(String id) {
+		return this.bankAccountRepository.findById(id);
 	}
 
+	// Get Bank Account Logs
+	// Return Logs in Turkish Sentence Format
 	public ArrayList<AccountLogResponse> getAccountLogs(String id) {
 		try {
 			ArrayList<AccountLogResponse> logs = new ArrayList<>();
@@ -127,6 +134,11 @@ public class BankAccountDal implements BankAccountDao {
 		} catch (Exception e) {
 			return false;
 		}
+	}
+
+	// Return Last Modification Date of Account
+	public long getLastModified(String id) {
+		return bankAccountRepository.getLastModified(id);
 	}
 
 }

@@ -3,14 +3,13 @@ package com.example.bankingsystem.business.concretes;
 import java.util.ArrayList;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
-import org.springframework.cache.annotation.Caching;
 import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
+import org.springframework.web.context.request.WebRequest;
 
 import com.example.bankingsystem.business.abstracts.BankAccountService;
 import com.example.bankingsystem.core.utilities.entities.AccountCreateErrorResponse;
@@ -22,6 +21,7 @@ import com.example.bankingsystem.core.utilities.entities.AccountDepositMoneyRequ
 import com.example.bankingsystem.core.utilities.entities.AccountLogResponse;
 import com.example.bankingsystem.core.utilities.entities.AccountMoneyTransferRequest;
 import com.example.bankingsystem.core.utilities.entities.AccountMoneyTransferResponse;
+import com.example.bankingsystem.core.utilities.entities.BankUser;
 import com.example.bankingsystem.core.utilities.exchange.CollectApiCurrencyExchange;
 import com.example.bankingsystem.dataAccess.abstracts.BankAccountDao;
 import com.example.bankingsystem.entities.BankAccount;
@@ -33,6 +33,8 @@ public class BankAccountManager implements BankAccountService {
 	private BankAccountDao bankAccountDao;
 	private KafkaTemplate<String, String> producer;
 	private CollectApiCurrencyExchange exchanger;
+	private BankAccount bankAccount;
+	private BankUser bankUser;
 
 	@Autowired
 	public BankAccountManager(BankAccountDao bankAccountDao, KafkaTemplate<String, String> producer,
@@ -42,9 +44,10 @@ public class BankAccountManager implements BankAccountService {
 		this.exchanger = exchanger;
 	}
 
+	// Check E-Mail, TC Identity and Currency Type Format
+	// If Formats are Valid, Create Account
 	@Override
 	public ResponseEntity<AccountCreateResponse> createAccount(AccountCreateRequest request) {
-		// Check E-Mail,Tc Identity Number and Currency Type
 		if (!request.isEmailAddressValid(request.getEmail()))
 			return new ResponseEntity<>(new AccountCreateErrorResponse("Invalid Mail Format!"), HttpStatus.BAD_REQUEST);
 		else if (!request.isTCIdentityNumberValid(request.getTc()))
@@ -57,41 +60,84 @@ public class BankAccountManager implements BankAccountService {
 					bankAccountDao.saveBankAccount(bankAccountDao.createAccount(request))), HttpStatus.OK);
 	}
 
-	// Add Account to Cache
-	@Cacheable(value = "'bank-account-'+#id", key = "'bank-account-'+#id")
+	// Check User Using his/her ID
+	// Check Account is Exist or Deleted
+	// Control Cache value is Up-To-Date
+	// Get Account Details
 	@Override
-	public ResponseEntity<BankAccount> getBankAccountDetails(String id) {
-		if (bankAccountDao.getBankAccount(id) == null)
+	public ResponseEntity<BankAccount> getBankAccountDetails(String id, WebRequest webRequest) {
+		try {
+			bankUser = (BankUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+			if (bankUser == null || !bankUser.getId().equals(bankAccountDao.getBankAccount(id).getUser_id()))
+				return new ResponseEntity<>(null, HttpStatus.FORBIDDEN);
+		} catch (Exception e) {
 			return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
-		else
-			return ResponseEntity.ok().lastModified(bankAccountDao.getBankAccount(id).getLastModified())
-					.body(bankAccountDao.getBankAccount(id));
-	}
+		}
 
-	// Remove Account From Cache
-	@CacheEvict(value = "'bank-account-'+#id", key = "'bank-account-'+#id")
-	@Override
-	public ResponseEntity<BankAccount> depositMoney2BankAccount(String id, AccountDepositMoneyRequest depositedMoney) {
 		if (bankAccountDao.getBankAccount(id) == null)
 			return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+
 		else {
-			// Kafka Logging Producer
-			producer.send("logs", id + " deposit amount: " + depositedMoney.getAmount()
-					+ bankAccountDao.getBankAccount(id).getType());
+			if (webRequest.checkNotModified(bankAccountDao.getLastModified(id)))
+				return null;
 
-			return ResponseEntity.ok().lastModified(bankAccountDao.getBankAccount(id).getLastModified())
-					.body(bankAccountDao.getBankAccount(bankAccountDao.updateBalance(bankAccountDao
-							.depositMoney2BankAccount(bankAccountDao.getBankAccount(id), depositedMoney.getAmount()))));
+			else
+				return ResponseEntity.ok().lastModified(bankAccountDao.getLastModified(id))
+						.body(bankAccountDao.getBankAccount(id));
 		}
 	}
 
-	// Remove Account and Transferred Account From Cache
-	@Caching(evict = { @CacheEvict(value = "'bank-account-'+#id", key = "'bank-account-'+#id"),
-			@CacheEvict(value = "'bank-account-'+#request.getTransferredAccountNumber()", key = "'bank-account-'+#request.getTransferredAccountNumber()") })
+	// Check User Using his/her ID
+	// Check Account is Exist or Deleted
+	// Deposit Money into Account and Update Account
+	// Send Log to Kafka Producer
+	// Get Updated Account Details
+	@Override
+	public ResponseEntity<BankAccount> depositMoney2BankAccount(String id, AccountDepositMoneyRequest depositedMoney) {
+		try {
+			bankUser = (BankUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+			if (bankUser == null || !bankUser.getId().equals(bankAccountDao.getBankAccount(id).getUser_id()))
+				return new ResponseEntity<>(null, HttpStatus.FORBIDDEN);
+		} catch (Exception e) {
+			return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+		}
+
+		if (bankAccountDao.getBankAccount(id) == null)
+			return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+		else {
+			bankAccount = bankAccountDao.getBankAccount(bankAccountDao.updateBalance(bankAccountDao
+					.depositMoney2BankAccount(bankAccountDao.getBankAccount(id), depositedMoney.getAmount())));
+			producer.send("logs", id + " deposit amount: " + depositedMoney.getAmount()
+					+ bankAccountDao.getBankAccount(id).getType());
+			return ResponseEntity.ok().lastModified(bankAccountDao.getLastModified(id)).body(bankAccount);
+		}
+	}
+
+	// Check User Using his/her ID
+	// Check Bank Accounts Exist or Deleted
+	// Get Account Types for Exchange Operations
+	// Check Withdrawed Balance
+	// Do Deposit and Withdraw Operations
+	// Update Accounts
+	// Send Log to Kafka Producer
+	// Get Updated Account Details
+	// Notes:
+	// - For gold operations, directly exchange is not possible,
+	// so first, get gold price in TL and exchange on TL currency
+	// - Conversion of values of the same type gives an error
+	// (response is null), so in this case, do directly transfer operations
 	@Override
 	public ResponseEntity<AccountMoneyTransferResponse> moneyTransferFromBankAccount(String id,
 			AccountMoneyTransferRequest request) {
-		// Check Bank Accounts Exist
+		try {
+			bankUser = (BankUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+			if (bankUser == null || !bankUser.getId().equals(bankAccountDao.getBankAccount(id).getUser_id()))
+				return new ResponseEntity<>(new AccountMoneyTransferResponse("Invalid Account Number"),
+						HttpStatus.FORBIDDEN);
+		} catch (Exception e) {
+			return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+		}
+
 		if (bankAccountDao.getBankAccount(id) == null
 				|| bankAccountDao.getBankAccount(request.getTransferredAccountNumber()) == null)
 			return new ResponseEntity<>(new AccountMoneyTransferResponse("Account cannot be found!"),
@@ -100,54 +146,42 @@ public class BankAccountManager implements BankAccountService {
 		String withdrawedAccountType = bankAccountDao.getBankAccount(id).getType();
 		String depositedAccountType = bankAccountDao.getBankAccount(request.getTransferredAccountNumber()).getType();
 
-		// Withdrawed Balance Check
 		if (bankAccountDao.isBalanceSufficientForWithdraw(bankAccountDao.getBankAccount(id), request.getAmount())) {
 			int exchangedAmount, gramGoldPriceInTRY;
-			// Exchange Check
 			if (!withdrawedAccountType.equals(depositedAccountType)) {
-				// Directly Gold Exchange is not possible
-				// Currency to Gold
+
 				if (depositedAccountType.equals("GAU")) {
-					// Get Gold Selling Price
 					gramGoldPriceInTRY = exchanger.getGramGoldPriceInTRY("selling");
-					// If Both types are 'TRY', Response is Null
 					if (!withdrawedAccountType.equals("TRY")) {
 						exchangedAmount = exchanger.exchangeCurrencies(request.getAmount(), withdrawedAccountType,
 								"TRY") / gramGoldPriceInTRY;
 					} else
 						exchangedAmount = request.getAmount() / gramGoldPriceInTRY;
-				}
-				// Gold to Currency
-				else if (withdrawedAccountType.equals("GAU")) {
-					// Get Gold Buying Price
+				} else if (withdrawedAccountType.equals("GAU")) {
 					gramGoldPriceInTRY = exchanger.getGramGoldPriceInTRY("buying");
-					// If Both types are 'TRY', Response is Null
 					if (!depositedAccountType.equals("TRY"))
 						exchangedAmount = exchanger.exchangeCurrencies(request.getAmount() * gramGoldPriceInTRY, "TRY",
 								depositedAccountType);
 					else
 						exchangedAmount = request.getAmount() * gramGoldPriceInTRY;
-				}
-				// Currency Exchange
-				else {
+				} else {
 					exchangedAmount = exchanger.exchangeCurrencies(request.getAmount(), withdrawedAccountType,
 							depositedAccountType);
 				}
 			} else {
 				exchangedAmount = request.getAmount();
 			}
-			// Withdraw and Save
+
 			bankAccountDao.updateBalance(bankAccountDao.withdrawMoneyFromBankAccount(bankAccountDao.getBankAccount(id),
 					request.getAmount()));
-			// Deposit and Save
 			bankAccountDao.updateBalance(bankAccountDao.depositMoney2BankAccount(
 					bankAccountDao.getBankAccount(request.getTransferredAccountNumber()), exchangedAmount));
-			// Kafka Logging Producer
+
 			producer.send("logs",
 					id + " transfer amount: " + request.getAmount() + bankAccountDao.getBankAccount(id).getType()
 							+ " transferred_account: " + request.getTransferredAccountNumber());
 
-			return ResponseEntity.ok().lastModified(bankAccountDao.getBankAccount(id).getLastModified())
+			return ResponseEntity.ok().lastModified(bankAccountDao.getLastModified(id))
 					.body(new AccountMoneyTransferResponse("Transferred succesfully!"));
 		} else {
 			return new ResponseEntity<>(new AccountMoneyTransferResponse("Insufficient balance!"),
@@ -155,18 +189,30 @@ public class BankAccountManager implements BankAccountService {
 		}
 	}
 
+	// Get Account Logs in Operations in List
 	@Override
 	public ResponseEntity<ArrayList<AccountLogResponse>> getAccountLogs(String id) {
 		return new ResponseEntity<>(bankAccountDao.getAccountLogs(id), HttpStatus.OK);
 	}
 
-	// Remove Account From Cache
-	@CacheEvict(value = "'bank-account-'+#id", key = "'bank-account-'+#id")
+	// Check User Using his/her ID
+	// Check Account is Exist or Deleted
+	// Delete Account(Set isDeleted 'True')
+	// Send Log to Kafka Producer
 	@Override
 	public ResponseEntity<AccountDeleteResponse> deleteBankAccount(String id) {
+		try {
+			bankUser = (BankUser) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+			if (bankUser == null || !bankUser.getId().equals(bankAccountDao.getBankAccount(id).getUser_id()))
+				return new ResponseEntity<>(new AccountDeleteResponse("Invalid Account Number"), HttpStatus.FORBIDDEN);
+		} catch (Exception e) {
+			// TODO: handle exception
+			return new ResponseEntity<>(null, HttpStatus.NOT_FOUND);
+		}
+
 		if (bankAccountDao.deleteBankAccount(bankAccountDao.getBankAccount(id))) {
 			producer.send("logs", id + " delete");
-			return ResponseEntity.ok().lastModified(bankAccountDao.getBankAccount(id).getLastModified())
+			return ResponseEntity.ok().lastModified(bankAccountDao.getLastModified(id))
 					.body(new AccountDeleteResponse("Account is deleted succesfully!"));
 		} else
 			return new ResponseEntity<>(new AccountDeleteResponse("Account cannot be found!"), HttpStatus.NOT_FOUND);

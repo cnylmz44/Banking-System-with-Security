@@ -2,8 +2,11 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 
 <mapper namespace = "com.example.bankingsystem.repositories.BankAccountRepository">
-	<select id="findByNumber" resultType="BankAccount" >
+	<select id="findById" resultType="BankAccount" >
 		SELECT * FROM bank_accounts WHERE id= #{id} AND isDeleted = 0
+	</select>
+	<select id="getLastModified" resultType="long" >
+		SELECT lastModified FROM bank_accounts WHERE id= #{id}
 	</select>
 	<insert id="createAccount" parameterType="BankAccount">
 		INSERT INTO bank_accounts(id, name, surname, email, tc, balance, type, isDeleted, lastModified) 
@@ -20,5 +23,8 @@
 	</insert>
 	<select id="findLogsByNumber" resultType="AccountLogResponse">
 		SELECT message FROM bank_account_logs WHERE message LIKE #{id}
+	</select>
+	<select id="getUserByUsername" resultType="String">
+		SELECT * FROM users WHERE username = #{username}
 	</select>
 </mapper>	

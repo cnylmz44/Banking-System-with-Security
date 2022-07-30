@@ -17,6 +17,7 @@ public class BankAccount implements Serializable {
 	private String type;
 	private boolean isDeleted;
 	private long lastModified;
+	private String user_id;
 
 	public BankAccount(String id, String name, String surname, String email, String tc, int balance, String type,
 			boolean isDeleted, long lastModified) {
@@ -101,6 +102,14 @@ public class BankAccount implements Serializable {
 
 	public void setLastModified(long lastModified) {
 		this.lastModified = lastModified;
+	}
+
+	public String getUser_id() {
+		return user_id;
+	}
+
+	public void setUser_id(String user_id) {
+		this.user_id = user_id;
 	}
 
 }
