@@ -47,17 +47,4 @@ public class UserController {
 		resp.setToken(token);
 		return ResponseEntity.ok().body(resp);
 	}
-
-	@GetMapping("/courses/{id}")
-	public String hello(@PathVariable String id) {
-		return "Hello World";
-	}
-
-	@GetMapping("/prices")
-	public String course() {
-		// User authUser = (User)
-		// SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-		return "prices";
-	}
-
 }
