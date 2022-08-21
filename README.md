@@ -11,13 +11,13 @@
 - _Collect API_
 
 ### Entities
-- Bank
+Bank
 _{
 int id PRIMARY KEY AUTO_INCREMENT,
 string name NOT NULL UNIQUE
 }_
 
-- Bank User
+Bank User
 _{
 int id PRIMARY KEY AUTO_INCREMENT,
 String username NOT NULL UNIQUE,
@@ -27,7 +27,7 @@ boolean enabled DEFAULT true,
 String authorities
 }_
 
-- Bank Account
+Bank Account
 _{
 int id PRIMARY KEY AUTO_INCREMENT,
 user_id FOREING KEY(users.id),
