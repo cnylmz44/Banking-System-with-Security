@@ -11,13 +11,13 @@
 - _Collect API_
 
 ### Entities
-Bank
+- Bank
 _{
 int id PRIMARY KEY AUTO_INCREMENT,
 string name NOT NULL UNIQUE
 }_
 
-Bank User
+- Bank User
 _{
 int id PRIMARY KEY AUTO_INCREMENT,
 String username NOT NULL UNIQUE,
@@ -27,13 +27,13 @@ boolean enabled DEFAULT true,
 String authorities
 }_
 
-Bank Account
+- Bank Account
 _{
 int id PRIMARY KEY AUTO_INCREMENT,
 user_id FOREING KEY(users.id),
 bank_id FOREIGN_KEY(banks.id),
-number int(10),
-enum type(TL,ALTIN,DOLAR)(String'de tutlabilir size bırakıyorum),
+number String,
+String type(TL,USD,GAU),
 double balance DEFAULT 0,
 timestamp creation_date,
 timestamp last_update_date,
